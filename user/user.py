@@ -9,7 +9,7 @@ router = APIRouter()
 
 class CreateUser(BaseModel):
     userName: str
-    phoneNumber: str
+    userPhoneNumber: str
     userAddress: str
     userDetailAddress: str
     userEmail: str
@@ -30,6 +30,10 @@ class Signin(BaseModel):
     userPassword: str
 
 
+class GetUserInfo(BaseModel):
+    userEmail: str
+
+
 @router.post("/signup")
 async def create_users(user: CreateUser):
     if not user.userName or not user.userPassword:
@@ -43,7 +47,7 @@ async def create_users(user: CreateUser):
 
     insertResult = client.get_database("dnd").get_collection("users").insert_one({
         "userName": user.userName,
-        "phoneNumber": user.phoneNumber,
+        "userPhoneNumber": user.userPhoneNumber,
         "userAddress": user.userAddress,
         "userDetailAddress": user.userDetailAddress,
         "userEmail": user.userEmail,
@@ -60,18 +64,15 @@ async def create_users(user: CreateUser):
 
 @router.post("/signup/email")
 async def check_email(user: ValidateEmail):
-    print("get request")
     client = connect_database()
 
     existingEmail = client.get_database("dnd").get_collection("users").find_one({"userEmail": user.userEmail})
 
     if (existingEmail):
         client.close()
-        print(existingEmail)
         return {"isValid": False}
 
     client.close()
-    print(existingEmail)
     return {"isValid": True}
 
 
@@ -87,3 +88,27 @@ async def signin(user: Signin):
         return {"message": "Valid password", "isValid": True}
     else:
         return {"message": "Password is wrong", "isValid": False}
+
+
+@router.post("/")
+async def getUserInfo(user: GetUserInfo):
+    print('get req')
+    client = connect_database()
+
+    getUser = client.get_database("dnd").get_collection("users").find_one({"userEmail": user.userEmail})
+
+    print(getUser);
+
+    if not getUser:
+        client.close()
+        return {"message": "Can't find you account", "isValid": False}
+
+    client.close()
+    return {
+        "userName": getUser["userName"],
+        "userPhoneNumber": getUser["userPhoneNumber"],
+        "userAddress": getUser["userAddress"],
+        "userDetailAddress": getUser["userDetailAddress"],
+        "userEmail": getUser["userEmail"],
+        "userPostCode": getUser["userPostCode"],
+    }
