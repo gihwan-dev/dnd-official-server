@@ -52,7 +52,7 @@ async def create_users(user: CreateUser):
         "userDetailAddress": user.userDetailAddress,
         "userEmail": user.userEmail,
         "userPostCode": user.userPostCode,
-        "userPassword": hashedPassword
+        "userPassword": hashedPassword,
     })
     client.close()
 
