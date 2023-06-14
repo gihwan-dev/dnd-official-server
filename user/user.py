@@ -92,12 +92,9 @@ async def signin(user: Signin):
 
 @router.post("/")
 async def getUserInfo(user: GetUserInfo):
-    print('get req')
     client = connect_database()
 
     getUser = client.get_database("dnd").get_collection("users").find_one({"userEmail": user.userEmail})
-
-    print(getUser);
 
     if not getUser:
         client.close()
