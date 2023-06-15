@@ -3,7 +3,7 @@ from typing import List
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from lib.db.pymongo_connect_database import connect_database
+from app.lib.db.pymongo_connect_database import connect_database
 
 router = APIRouter()
 
