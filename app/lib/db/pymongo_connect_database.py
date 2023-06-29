@@ -14,7 +14,7 @@ def connect_database():
     settings = Settings()
     # 드라이버를 통해 연결할 데이터베이스 URL
 
-    DATABASE_URL = "//rlghks3004:2Kf6alnDRXkc2pM9@algorithm.4hwfeom.mongodb.net/?retryWrites=true&w=majority"
+    DATABASE_URL = "mongodb+srv://rlghks3004:2Kf6alnDRXkc2pM9@algorithm.4hwfeom.mongodb.net/?retryWrites=true&w=majority"
 
     ca = certifi.where()
 
