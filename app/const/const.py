@@ -1,0 +1,1 @@
+DB_URL = "mongodb+srv://rlghks3004:2Kf6alnDRXkc2pM9@algorithm.4hwfeom.mongodb.net/?retryWrites=true&w=majority"
