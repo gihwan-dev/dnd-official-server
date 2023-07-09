@@ -95,6 +95,7 @@ async def auth_store(store: StoreLogin):
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
+
 @router.post("/")
 async def create_store(store: CreateStore):
     client = connect_database()
