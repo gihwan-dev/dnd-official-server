@@ -1,8 +1,10 @@
+import json
+
 from fastapi import APIRouter
 from pydantic import BaseModel
-from app.lib.db.pymongo_connect_database import  connect_database
+from app.lib.db.pymongo_connect_database import connect_database
 from app.lib.hash.hash import comparePassword, hashPassword
-from app.model.store import StoreModel
+from app.model.store import StoreModel, Daily, Month, Year
 from fastapi import HTTPException, Depends, status
 from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
@@ -31,7 +33,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     return encoded_jwt
 
 
-async def get_current_storeId(entered_jwt: str):
+async def get_current_store_id(entered_jwt: str):
     payload = jwt.decode(token=entered_jwt, key=SECRET_KEY, algorithms=[ALGORITHM])
 
     storeId = payload.get("sub")
@@ -52,8 +54,10 @@ class StoreLogin(BaseModel):
     storeId: str
     storePassword: str
 
+
 class StoreOnlyId(BaseModel):
     storeId: str
+
 
 class CreateStore(BaseModel):
     storeId: str
@@ -63,8 +67,32 @@ class CreateStore(BaseModel):
     storePostCode: str
     storeName: str
 
+
 class CreateStoreResponse(BaseModel):
     isCreated: bool
+
+
+class CheckStoreId(BaseModel):
+    storeId: str
+
+@router.post("/check")
+async def check_id(store: CheckStoreId):
+    client = connect_database()
+    user = client.get_database("dnd").get_collection("stores").find_one({"storeId": store.storeId})
+
+    if user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="이미 존재하는 id 입니다."
+        )
+
+    client.close()
+    return {
+        "isValid": True
+    }
+
+
+
 @router.post("/login", response_model=Token)
 async def auth_store(store: StoreLogin):
     client = connect_database()
@@ -75,7 +103,7 @@ async def auth_store(store: StoreLogin):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="해당 id의 유저가 존재 하지 않습니다.",
-            headers={"WWW-Authenticate" : "Bearer"}
+            headers={"WWW-Authenticate": "Bearer"}
         )
 
     is_valid = comparePassword(store.storePassword, user["storePassword"])
@@ -113,21 +141,40 @@ async def create_store(store: CreateStore):
 
     hashed_password = hashPassword(store.storePassword)
 
-    new_store = StoreModel()
-    new_store.storeId = store.storeId
-    new_store.storePassword = hashed_password
-    new_store.storeName = store.storeName,
-    new_store.storeAddress = store.storeAddress
-    new_store.storeDetailAddress = store.storeDetailAddress,
-    new_store.storePostCode = store.storePostCode
-    new_store.status = False,
-    new_store.items = [],
-    new_store.storeConTactNumber = "",
-    new_store.certification = "",
-    new_store.ownerName = "",
-    new_store.tag = "",
-    new_store.dailyCount = 0,
-    new_store.workingInfo = []
+    new_day = Daily(
+        date="11일",
+        total=10000,
+        amount=100
+    )
+
+    new_month = Month(
+        month="1월",
+        day_list=[new_day]
+    )
+
+    new_year = Year(
+        year="2023",
+        month_list=[new_month]
+    )
+
+
+    new_store = StoreModel(
+        storeId=store.storeId,
+        storePassword=hashed_password,
+        storeName=store.storeName,
+        storeAddress=store.storeAddress,
+        storeDetailAddress=store.storeDetailAddress,
+        storePostCode=store.storePostCode,
+        status=False,
+        items=[],
+        storeConTactNumber="",
+        certification="",
+        ownerName="",
+        tag="",
+        dailyCount=0,
+        workingInfo=[],
+        statics=[new_year]
+    )
 
     insert_result = collection.insert_one(new_store.dict())
 
@@ -140,4 +187,3 @@ async def create_store(store: CreateStore):
     return {
         "isCreated": True
     }
-

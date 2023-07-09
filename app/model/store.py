@@ -1,11 +1,30 @@
 from pydantic import BaseModel
 from typing import List, Optional
 
+
 class Item(BaseModel):
     name: str
     price: int
     description: str
     available: bool
+
+
+class Daily(BaseModel):
+    date: str
+    total: int
+    amount: int
+
+
+class Month(BaseModel):
+    month: str
+    day_list: List[Daily]
+
+
+class Year(BaseModel):
+    year: str
+    month_list: List[Month]
+
+
 class StoreModel(BaseModel):
     storeId: str  # 필수
     storePassword: str  # 필수
@@ -21,5 +40,6 @@ class StoreModel(BaseModel):
     tag: str  # 필수
     dailyCount: int
     workingInfo: List[str]
+    statics: List[Year]
 
 
