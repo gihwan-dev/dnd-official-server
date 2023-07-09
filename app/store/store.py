@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 from app.lib.db.pymongo_connect_database import  connect_database
 from app.lib.hash.hash import comparePassword, hashPassword
-from typing import Annotated
+from app.model.store import StoreModel
 from fastapi import HTTPException, Depends, status
 from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
@@ -85,7 +85,7 @@ async def auth_store(store: StoreLogin):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="패스워드가 일치 하지 않습니다.",
-            headers={"WWW-Authenticate" : "Bearer"}
+            headers={"WWW-Authenticate": "Bearer"}
         )
 
     client.close()
@@ -94,6 +94,7 @@ async def auth_store(store: StoreLogin):
         data={"sub": user["storeId"], }, expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}
+
 
 @router.post("/")
 async def create_store(store: CreateStore):
@@ -112,22 +113,23 @@ async def create_store(store: CreateStore):
 
     hashed_password = hashPassword(store.storePassword)
 
-    insert_result = collection.insert_one({
-        "storeId": store.storeId,
-        "storePassword": hashed_password,
-        "storeName": store.storeName,
-        "storeAddress": store.storeAddress,
-        "storeDetailAddress": store.storeDetailAddress,
-        "storePostCode": store.storePostCode,
-        "status": False,
-        "items": [],
-        "storeContactNumber": "",
-        "certification": "",
-        "workingInfo": [],
-        "ownerName": "",
-        "tag": "",
-        "dailyCount": 0,
-    })
+    new_store = StoreModel()
+    new_store.storeId = store.storeId
+    new_store.storePassword = hashed_password
+    new_store.storeName = store.storeName,
+    new_store.storeAddress = store.storeAddress
+    new_store.storeDetailAddress = store.storeDetailAddress,
+    new_store.storePostCode = store.storePostCode
+    new_store.status = False,
+    new_store.items = [],
+    new_store.storeConTactNumber = "",
+    new_store.certification = "",
+    new_store.ownerName = "",
+    new_store.tag = "",
+    new_store.dailyCount = 0,
+    new_store.workingInfo = []
+
+    insert_result = collection.insert_one(new_store.dict())
 
     if not insert_result.acknowledged:
         raise HTTPException(
