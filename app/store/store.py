@@ -66,6 +66,10 @@ class CreateStore(BaseModel):
     storeDetailAddress: str
     storePostCode: str
     storeName: str
+    ownerName: str
+    certification: str
+    storeContactNumber: str
+    tag: str
 
 
 class CreateStoreResponse(BaseModel):
@@ -141,21 +145,21 @@ async def create_store(store: CreateStore):
 
     hashed_password = hashPassword(store.storePassword)
 
-    new_day = Daily(
-        date="11일",
-        total=10000,
-        amount=100
-    )
-
-    new_month = Month(
-        month="1월",
-        day_list=[new_day]
-    )
-
-    new_year = Year(
-        year="2023",
-        month_list=[new_month]
-    )
+    # new_day = Daily(
+    #     date="11일",
+    #     total=10000,
+    #     amount=100
+    # )
+    #
+    # new_month = Month(
+    #     month="1월",
+    #     day_list=[new_day]
+    # )
+    #
+    # new_year = Year(
+    #     year="2023",
+    #     month_list=[new_month]
+    # )
 
 
     new_store = StoreModel(
@@ -167,13 +171,13 @@ async def create_store(store: CreateStore):
         storePostCode=store.storePostCode,
         status=False,
         items=[],
-        storeConTactNumber="",
-        certification="",
-        ownerName="",
-        tag="",
+        storeConTactNumber=store.storeContactNumber,
+        certification=store.certification,
+        ownerName=store.ownerName,
+        tag=store.tag,
         dailyCount=0,
         workingInfo=[],
-        statics=[new_year]
+        statics=[],
     )
 
     insert_result = collection.insert_one(new_store.dict())
