@@ -1,5 +1,6 @@
-from pydantic import BaseModel
 from typing import List, Optional
+
+from pydantic import BaseModel
 
 
 class Item(BaseModel):
@@ -29,17 +30,17 @@ class StoreModel(BaseModel):
     storeId: str  # 필수
     storePassword: str  # 필수
     storeName: str  # 필수
-    storeAddress: str   # 필수
+    storeAddress: str  # 필수
     storeDetailAddress: str  # 필수
     storePostCode: str  # 필수
     status: bool
-    items: List[Item]
+    items: Optional[List[Year]]
     storeConTactNumber: str  # 필수
     certification: str  # 필수
     ownerName: str  # 필수
     tag: str  # 필수
-    dailyCount: int
-    workingInfo: List[str]
-    statics: List[Year]
-
-
+    dailyCount: Optional[int]
+    workingInfo: Optional[List[str]]
+    statics: Optional[List[Year]]
+    todoList: Optional[List[str]]
+    startTime: int
