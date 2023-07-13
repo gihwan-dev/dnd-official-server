@@ -9,6 +9,7 @@ class Item(BaseModel):
     description: str
     available: bool
     # 주문수
+    # amount: int
 
 
 class Daily(BaseModel):
@@ -48,5 +49,6 @@ class StoreModel(BaseModel):
     workingInfo: Optional[List[str]]
     statics: Optional[List[Year]]
     todoList: Optional[List[str]]
+    total: int
     startTime: int
     years: List[Year]

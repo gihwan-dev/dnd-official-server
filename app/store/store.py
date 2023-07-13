@@ -182,17 +182,19 @@ async def create_store(store: CreateStore):
         statics=[],
         todoList=[],
         startTime=0,
-        years=[new_year]
+        years=[new_year],
+        total=0
     )
 
     insert_result = collection.insert_one(new_store.dict())
 
     if not insert_result.acknowledged:
+        client.close()
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="가게를 생성 하는데 실패했습니다. 다시 시도해 주세요"
         )
-
+    client.close()
     return {
         "isCreated": True
     }
@@ -205,7 +207,7 @@ async def get_store(request: Request):
 
     client = connect_database()
     current_store = client.get_database("dnd").get_collection("stores").find_one({"storeId": storeId})
-
+    client.close()
     return current_store
 
 
@@ -228,6 +230,8 @@ async def add_memo(data: AddMemoRequest, req: Request):
     updated_todo = existing_todo.copy()
 
     update_result = store_collection.update_one({"storeId": storeId}, {"$set": {"todoList": updated_todo}})
+
+    client.close()
 
     if not update_result:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="메모 추가에 실패했습니다.")
@@ -253,6 +257,8 @@ async def delete_memo(data: DeleteMemoRequest, req: Request):
 
     update_result = store_collection.update_one({"storeId": storeId}, {"$set": {"todoList": updated_todo}})
 
+    client.close()
+
     if not update_result:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -274,6 +280,7 @@ async def start_store(data: StoreStartRequest, req: Request):
 
     update_result = store_collection.update_one({"storeId": storeId},
                                                 {"$set": {"status": True, "startTime": data.startTime}})
+    client.close()
 
     if not update_result.acknowledged:
         raise HTTPException(
@@ -291,9 +298,41 @@ async def end_store(req: Request):
     store_collection = client.get_database("dnd").get_collection("stores")
 
     update_result = store_collection.update_one({"storeId": storeId}, {"$set": {"status": False, "startTime": 0}})
+    client.close()
 
     if not update_result.acknowledged:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="프로그램을 종료하는데 실패했습니다."
         )
+
+
+class TestInsertYear(BaseModel):
+    year: int
+    total: int
+    amount: int
+    month_list: List[Month]
+
+
+@router.post("/test")
+async def insertYear(data: TestInsertYear):
+    client = connect_database()
+    store_collection = client.get_database("dnd").get_collection("stores")
+
+    test = store_collection.find_one({"storeId": "string"})
+
+    new_data = test.copy()
+
+    new_data["years"].append(data.dict())
+
+    insert_result = store_collection.update_one({"storeId": "string"}, {"$set": {"years": new_data["years"]}})
+
+    if (insert_result.acknowledged):
+        client.close()
+        return {
+            "isInserted": True
+        }
+    client.close()
+    return {
+        "isInserted": False
+    }
