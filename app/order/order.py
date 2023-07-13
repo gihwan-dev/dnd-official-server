@@ -4,6 +4,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from app.lib.db.pymongo_connect_database import connect_database
+from app.model.order import Order
 
 router = APIRouter()
 
@@ -22,15 +23,6 @@ class AddItem:
 
 class GetOrder(BaseModel):
     userEmail: str
-
-
-class CompleteOrder(BaseModel):
-    userEmail: str
-    userName: str
-    total: int
-    payMethod: str
-    payDate: str
-    cart: List[Item]
 
 
 class Test(BaseModel):
@@ -60,19 +52,25 @@ async def get_order(user: GetOrder):
 
 
 @router.post("/complete")
-async def complete_order(order_info: CompleteOrder):
+async def complete_order(order_info: Order):
     client = connect_database()
 
-    items = [item.dict() for item in order_info.cart]
+    new_items = [item.dict() for item in order_info.items]
 
-    order_result = client.get_database("dnd").get_collection("orders").insert_one({
-        "userEmail": order_info.userEmail,
-        "userName": order_info.userEmail,
-        "total": order_info.total,
-        "payMethod": order_info.payMethod,
-        "payDate": order_info.payDate,
-        "cart": items,
-    })
+    new_order = Order(
+        userEmail=order_info.userEmail,
+        storeId=order_info.storeId,
+        items=new_items,
+        totalAmount=order_info.totalAmount,
+        latitude=order_info.latitude,
+        longitude=order_info.longitude,
+        date=order_info.date,
+        payMethod=order_info.payMethod,
+        status=order_info.status,
+        request=order_info.request
+    )
+
+    order_result = client.get_database("dnd").get_collection("orders").insert_one(new_order.dict())
 
     if (order_result.acknowledged):
         return {"accepted": True}
