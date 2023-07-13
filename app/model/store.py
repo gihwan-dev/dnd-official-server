@@ -19,11 +19,15 @@ class Daily(BaseModel):
 
 class Month(BaseModel):
     month: int
+    total: int
+    amount: int
     day_list: List[Daily]
 
 
 class Year(BaseModel):
     year: int
+    total: int
+    amount: int
     month_list: List[Month]
 
 

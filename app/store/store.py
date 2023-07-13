@@ -152,11 +152,15 @@ async def create_store(store: CreateStore):
 
     new_month = Month(
         month=month_now,
+        total=0,
+        amount=0,
         day_list=[new_day]
     )
 
     new_year = Year(
         year=year_now,
+        total=0,
+        amount=0,
         month_list=[new_month]
     )
 
