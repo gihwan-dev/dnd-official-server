@@ -1,13 +1,15 @@
+from typing import List
+
 from fastapi import APIRouter
+from fastapi import HTTPException, status, Request
+from fastapi.security import OAuth2PasswordBearer
+from jose import jwt
+from passlib.context import CryptContext
 from pydantic import BaseModel
-from app.lib.db.pymongo_connect_database import  connect_database
+
+from app.lib.db.pymongo_connect_database import connect_database
 from app.lib.hash.hash import comparePassword, hashPassword
 from app.model.store import StoreModel
-from fastapi import HTTPException, Depends, status
-from fastapi.security import OAuth2PasswordBearer
-from passlib.context import CryptContext
-from datetime import datetime, timedelta
-from jose import jwt
 
 SECRET_KEY = "ex5eYU5PgIQDyyAN+aJFBm+3ADNAV8V7g168sgRZ/7w="
 ALGORITHM = "HS256"
@@ -20,28 +22,21 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 router = APIRouter()
 
 
-def create_access_token(data: dict, expires_delta: timedelta | None = None):
+def create_access_token(data: dict):
     to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
-    to_encode.update({"exp": expire})
+
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
 
-async def get_current_storeId(entered_jwt: str):
+def get_current_store_id(entered_jwt: str):
     payload = jwt.decode(token=entered_jwt, key=SECRET_KEY, algorithms=[ALGORITHM])
-
-    storeId = payload.get("sub")
-
+    storeId = payload["storeId"]
     return storeId
 
 
 class Token(BaseModel):
     access_token: str
-    token_type: str
 
 
 class TokenData(BaseModel):
@@ -52,8 +47,10 @@ class StoreLogin(BaseModel):
     storeId: str
     storePassword: str
 
+
 class StoreOnlyId(BaseModel):
     storeId: str
+
 
 class CreateStore(BaseModel):
     storeId: str
@@ -62,9 +59,37 @@ class CreateStore(BaseModel):
     storeDetailAddress: str
     storePostCode: str
     storeName: str
+    ownerName: str
+    certification: str
+    storeContactNumber: str
+    tag: str
+
 
 class CreateStoreResponse(BaseModel):
     isCreated: bool
+
+
+class CheckStoreId(BaseModel):
+    storeId: str
+
+
+@router.post("/check")
+async def check_id(store: CheckStoreId):
+    client = connect_database()
+    user = client.get_database("dnd").get_collection("stores").find_one({"storeId": store.storeId})
+
+    if user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="이미 존재하는 id 입니다."
+        )
+
+    client.close()
+    return {
+        "isValid": True
+    }
+
+
 @router.post("/login", response_model=Token)
 async def auth_store(store: StoreLogin):
     client = connect_database()
@@ -75,7 +100,7 @@ async def auth_store(store: StoreLogin):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="해당 id의 유저가 존재 하지 않습니다.",
-            headers={"WWW-Authenticate" : "Bearer"}
+            headers={"WWW-Authenticate": "Bearer"}
         )
 
     is_valid = comparePassword(store.storePassword, user["storePassword"])
@@ -89,11 +114,10 @@ async def auth_store(store: StoreLogin):
         )
 
     client.close()
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user["storeId"], }, expires_delta=access_token_expires
+        data={"storeId": store.storeId}
     )
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {"access_token": access_token}
 
 
 @router.post("/")
@@ -113,21 +137,41 @@ async def create_store(store: CreateStore):
 
     hashed_password = hashPassword(store.storePassword)
 
-    new_store = StoreModel()
-    new_store.storeId = store.storeId
-    new_store.storePassword = hashed_password
-    new_store.storeName = store.storeName,
-    new_store.storeAddress = store.storeAddress
-    new_store.storeDetailAddress = store.storeDetailAddress,
-    new_store.storePostCode = store.storePostCode
-    new_store.status = False,
-    new_store.items = [],
-    new_store.storeConTactNumber = "",
-    new_store.certification = "",
-    new_store.ownerName = "",
-    new_store.tag = "",
-    new_store.dailyCount = 0,
-    new_store.workingInfo = []
+    # new_day = Daily(
+    #     date="11일",
+    #     total=10000,
+    #     amount=100
+    # )
+    #
+    # new_month = Month(
+    #     month="1월",
+    #     day_list=[new_day]
+    # )
+    #
+    # new_year = Year(
+    #     year="2023",
+    #     month_list=[new_month]
+    # )
+
+    new_store = StoreModel(
+        storeId=store.storeId,
+        storePassword=hashed_password,
+        storeName=store.storeName,
+        storeAddress=store.storeAddress,
+        storeDetailAddress=store.storeDetailAddress,
+        storePostCode=store.storePostCode,
+        status=False,
+        items=[],
+        storeConTactNumber=store.storeContactNumber,
+        certification=store.certification,
+        ownerName=store.ownerName,
+        tag=store.tag,
+        dailyCount=0,
+        workingInfo=[],
+        statics=[],
+        todoList=[],
+        startTime=0,
+    )
 
     insert_result = collection.insert_one(new_store.dict())
 
@@ -141,3 +185,103 @@ async def create_store(store: CreateStore):
         "isCreated": True
     }
 
+
+@router.get("/", response_model=StoreModel)
+async def get_store(request: Request):
+    encoded_id = request.cookies.get("jwt")
+    storeId = get_current_store_id(encoded_id)
+
+    client = connect_database()
+    current_store = client.get_database("dnd").get_collection("stores").find_one({"storeId": storeId})
+
+    return current_store
+
+
+class AddMemoRequest(BaseModel):
+    memo: str
+
+
+@router.post("/memo")
+async def add_memo(data: AddMemoRequest, req: Request):
+    encoded_id = req.cookies.get("jwt")
+    storeId = get_current_store_id(encoded_id)
+
+    client = connect_database()
+    store_collection = client.get_database("dnd").get_collection("stores")
+    store = store_collection.find_one({"storeId": storeId})
+
+    existing_todo: List[str] = store["todoList"].copy()
+    existing_todo.append(data.memo)
+
+    updated_todo = existing_todo.copy()
+
+    update_result = store_collection.update_one({"storeId": storeId}, {"$set": {"todoList": updated_todo}})
+
+    if not update_result:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="메모 추가에 실패했습니다.")
+
+
+class DeleteMemoRequest(BaseModel):
+    index: int
+
+
+@router.delete("/memo")
+async def delete_memo(data: DeleteMemoRequest, req: Request):
+    encoded_id = req.cookies.get("jwt")
+    storeId = get_current_store_id(encoded_id)
+
+    client = connect_database()
+    store_collection = client.get_database("dnd").get_collection("stores")
+    store = store_collection.find_one({"storeId": storeId})
+
+    existing_todo: List[str] = store["todoList"].copy()
+    del existing_todo[data.index]
+
+    updated_todo = existing_todo.copy()
+
+    update_result = store_collection.update_one({"storeId": storeId}, {"$set": {"todoList": updated_todo}})
+
+    if not update_result:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="메모 삭제에 실패했습니다."
+        )
+
+
+class StoreStartRequest(BaseModel):
+    startTime: int
+
+
+@router.post("/start")
+async def start_store(data: StoreStartRequest, req: Request):
+    encoded_id = req.cookies.get("jwt")
+    storeId = get_current_store_id(encoded_id)
+
+    client = connect_database()
+    store_collection = client.get_database("dnd").get_collection("stores")
+
+    update_result = store_collection.update_one({"storeId": storeId},
+                                                {"$set": {"status": True, "startTime": data.startTime}})
+
+    if not update_result.acknowledged:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="프로그램을 시작하는데 실패했습니다."
+        )
+
+
+@router.post("/end")
+async def end_store(req: Request):
+    encoded_id = req.cookies.get("jwt")
+    storeId = get_current_store_id(encoded_id)
+
+    client = connect_database()
+    store_collection = client.get_database("dnd").get_collection("stores")
+
+    update_result = store_collection.update_one({"storeId": storeId}, {"$set": {"status": False, "startTime": 0}})
+
+    if not update_result.acknowledged:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="프로그램을 종료하는데 실패했습니다."
+        )
