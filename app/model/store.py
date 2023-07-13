@@ -8,21 +8,22 @@ class Item(BaseModel):
     price: int
     description: str
     available: bool
+    # 주문수
 
 
 class Daily(BaseModel):
-    date: str
+    date: int
     total: int
     amount: int
 
 
 class Month(BaseModel):
-    month: str
+    month: int
     day_list: List[Daily]
 
 
 class Year(BaseModel):
-    year: str
+    year: int
     month_list: List[Month]
 
 
@@ -44,3 +45,4 @@ class StoreModel(BaseModel):
     statics: Optional[List[Year]]
     todoList: Optional[List[str]]
     startTime: int
+    years: List[Year]

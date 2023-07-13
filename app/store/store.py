@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List
 
 from fastapi import APIRouter
@@ -9,7 +10,7 @@ from pydantic import BaseModel
 
 from app.lib.db.pymongo_connect_database import connect_database
 from app.lib.hash.hash import comparePassword, hashPassword
-from app.model.store import StoreModel
+from app.model.store import StoreModel, Daily, Month, Year
 
 SECRET_KEY = "ex5eYU5PgIQDyyAN+aJFBm+3ADNAV8V7g168sgRZ/7w="
 ALGORITHM = "HS256"
@@ -137,21 +138,27 @@ async def create_store(store: CreateStore):
 
     hashed_password = hashPassword(store.storePassword)
 
-    # new_day = Daily(
-    #     date="11일",
-    #     total=10000,
-    #     amount=100
-    # )
-    #
-    # new_month = Month(
-    #     month="1월",
-    #     day_list=[new_day]
-    # )
-    #
-    # new_year = Year(
-    #     year="2023",
-    #     month_list=[new_month]
-    # )
+    now = datetime.now()
+
+    year_now = now.year
+    month_now = now.month
+    day_now = now.day
+
+    new_day = Daily(
+        date=day_now,
+        total=0,
+        amount=0
+    )
+
+    new_month = Month(
+        month=month_now,
+        day_list=[new_day]
+    )
+
+    new_year = Year(
+        year=year_now,
+        month_list=[new_month]
+    )
 
     new_store = StoreModel(
         storeId=store.storeId,
@@ -171,6 +178,7 @@ async def create_store(store: CreateStore):
         statics=[],
         todoList=[],
         startTime=0,
+        years=[new_year]
     )
 
     insert_result = collection.insert_one(new_store.dict())
