@@ -377,8 +377,32 @@ async def create_item(req: Request, image: UploadFile = Form(...), name: str = F
     with open(os.path.join(abs_cwd + "/app/store/images", storeId + "_" + name + ".jpeg"), "wb") as fp:
         fp.write(content)
 
+    client.close()
+
 
 @router.get("/item/{filename}")
 async def get_image(filename: str):
     abs_cwd = os.getcwd()
     return FileResponse(f'{abs_cwd}/app/store/images/{filename}.jpeg', media_type="image/jpeg")
+
+
+@router.get("/order")
+async def get_order(req: Request):
+    encoded_id = req.cookies.get("jwt")
+    storeId = get_current_store_id(encoded_id)
+
+    client = connect_database()
+
+    order_collection = client.get_database("dnd").get_collection("orders")
+
+    existing_store_orders = order_collection.find({"storeId": storeId})
+
+    updated_orders = []
+
+    for order in existing_store_orders:
+        new_order = order.copy()
+        new_order["_id"] = str(new_order["_id"])
+        updated_orders.append(new_order)
+
+    client.close()
+    return updated_orders
