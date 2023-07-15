@@ -40,7 +40,7 @@ class StoreModel(BaseModel):
     storeDetailAddress: str  # 필수
     storePostCode: str  # 필수
     status: bool
-    items: Optional[List[Year]]
+    items: Optional[List[Item]]
     storeConTactNumber: str  # 필수
     certification: str  # 필수
     ownerName: str  # 필수
