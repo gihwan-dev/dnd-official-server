@@ -357,7 +357,8 @@ async def create_item(req: Request, image: UploadFile = Form(...), name: str = F
         name=name,
         price=price,
         description=description,
-        available=True
+        available=True,
+        amount=0
     )
 
     updating_items.append(new_item.dict())
@@ -374,11 +375,78 @@ async def create_item(req: Request, image: UploadFile = Form(...), name: str = F
 
     abs_cwd = os.getcwd()
 
-    with open(os.path.join(abs_cwd + "/app/store/images", storeId + "_" + name + ".jpeg"), "wb") as fp:
+    with open(os.path.join(abs_cwd + "/app/store/images", storeId + "_" + name + ".jpg"), "wb") as fp:
         fp.write(content)
 
 
 @router.get("/item/{filename}")
 async def get_image(filename: str):
     abs_cwd = os.getcwd()
-    return FileResponse(f'{abs_cwd}/app/store/images/{filename}.jpeg', media_type="image/jpeg")
+    return FileResponse(f'{abs_cwd}/app/store/images/{filename}.jpg', media_type="image/jpg")
+
+
+class UpdateItemReq(BaseModel):
+    item: Item
+
+@router.patch("/item")
+async def update_item(req: Request, data: UpdateItemReq):
+    encoded_id = req.cookies.get("jwt")
+    storeId = get_current_store_id(encoded_id)
+
+    client = connect_database()
+    collection = client.get_database("dnd").get_collection("stores")
+
+    result = collection.update_one({"storeId": storeId, "items.name": data.item.name},
+                                   {"$set": {"items.$[elem]": data.item.dict()}},
+                                   array_filters=[{"elem.name": data.item.name}])
+
+    if not result.acknowledged:
+        raise HTTPException(
+            status_code=404,
+            detail="업데이트에 실패했습니다. 다시 시도해 주세요."
+        )
+
+class DeleteItemReq(BaseModel):
+    name:str
+
+@router.delete("/item")
+async def delete_item(req:Request, data:DeleteItemReq):
+    encoded_id = req.cookies.get("jwt")
+    storeId = get_current_store_id(encoded_id)
+
+    client = connect_database()
+    collection = client.get_database("dnd").get_collection("stores")
+
+    store = collection.find_one({"storeId": storeId})
+
+    existing_items = store["items"].copy()
+
+    updated_items = []
+
+    for item in existing_items:
+        if item["name"] != data.name:
+            updated_items.append(item)
+
+    delete_result = collection.update_one({"storeId": storeId},
+                                          {"$set": {"items": updated_items}})
+
+    if not delete_result.acknowledged:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="삭제하는데 실패했습니다."
+        )
+
+
+@router.get("/order")
+async def get_order(req: Request):
+    encoded_id = req.cookies.get("jwt")
+    storeId = get_current_store_id(encoded_id)
+
+    client = connect_database()
+    collection = client.get_database("dnd").get_collection("orders")
+
+    order_list = collection.find({"storeId": storeId})
+
+    return {
+        "orders": order_list
+    }

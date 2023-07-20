@@ -8,8 +8,7 @@ class Item(BaseModel):
     price: int
     description: str
     available: bool
-    # 주문수
-    # amount: int
+    amount: int
 
 
 class Daily(BaseModel):
