@@ -1,14 +1,14 @@
 import os
 from datetime import datetime
-from typing import List
-
 from fastapi import APIRouter, UploadFile, Form
 from fastapi import HTTPException, status, Request
+from fastapi.responses import FileResponse
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel
 from starlette.responses import FileResponse
+from typing import List
 
 from app.lib.db.pymongo_connect_database import connect_database
 from app.lib.hash.hash import comparePassword, hashPassword
@@ -375,8 +375,38 @@ async def create_item(req: Request, image: UploadFile = Form(...), name: str = F
 
     abs_cwd = os.getcwd()
 
-    with open(os.path.join(abs_cwd + "/app/store/images", storeId + "_" + name + ".jpg"), "wb") as fp:
+    with open(os.path.join(abs_cwd + "/app/store/images", storeId + "_" + name + ".jpeg"), "wb") as fp:
         fp.write(content)
+
+    client.close()
+
+
+@router.delete("/item/{menu_name}")
+async def delete_item(menu_name: str, req: Request):
+    encoded_id = req.cookies.get("jwt")
+    storeId = get_current_store_id(encoded_id)
+
+    client = connect_database()
+    collections = client.get_database("dnd").get_collection("stores")
+
+    delete_result = collections.update_one(
+        {"storeId": storeId},
+        {"$pull": {"items": {"name": menu_name}}}
+    )
+
+    abs_cwd = os.getcwd()
+
+    try:
+        os.remove(abs_cwd + "/app/store/images/" + storeId + "_" + menu_name + ".jpeg")
+    except FileNotFoundError:
+        print("File not found.")
+
+    if not delete_result.acknowledged:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="메뉴를 제거하는데 실패했습니다. 다시 시도해 주세요."
+        )
+    return {"message": "메뉴를 성공적으로 제거했습니다."}
 
 
 @router.get("/item/{filename}")
@@ -387,6 +417,7 @@ async def get_image(filename: str):
 
 class UpdateItemReq(BaseModel):
     item: Item
+
 
 @router.patch("/item")
 async def update_item(req: Request, data: UpdateItemReq):
@@ -406,36 +437,6 @@ async def update_item(req: Request, data: UpdateItemReq):
             detail="업데이트에 실패했습니다. 다시 시도해 주세요."
         )
 
-class DeleteItemReq(BaseModel):
-    name:str
-
-@router.delete("/item")
-async def delete_item(req:Request, data:DeleteItemReq):
-    encoded_id = req.cookies.get("jwt")
-    storeId = get_current_store_id(encoded_id)
-
-    client = connect_database()
-    collection = client.get_database("dnd").get_collection("stores")
-
-    store = collection.find_one({"storeId": storeId})
-
-    existing_items = store["items"].copy()
-
-    updated_items = []
-
-    for item in existing_items:
-        if item["name"] != data.name:
-            updated_items.append(item)
-
-    delete_result = collection.update_one({"storeId": storeId},
-                                          {"$set": {"items": updated_items}})
-
-    if not delete_result.acknowledged:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="삭제하는데 실패했습니다."
-        )
-
 
 @router.get("/order")
 async def get_order(req: Request):
@@ -443,6 +444,7 @@ async def get_order(req: Request):
     storeId = get_current_store_id(encoded_id)
 
     client = connect_database()
+
     collection = client.get_database("dnd").get_collection("orders")
 
     order_list = collection.find({"storeId": storeId})
