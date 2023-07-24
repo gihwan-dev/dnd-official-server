@@ -1,14 +1,14 @@
 import os
 from datetime import datetime
+from typing import List
+
 from fastapi import APIRouter, UploadFile, Form
 from fastapi import HTTPException, status, Request
-from fastapi.responses import FileResponse
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel
 from starlette.responses import FileResponse
-from typing import List
 
 from app.lib.db.pymongo_connect_database import connect_database
 from app.lib.hash.hash import comparePassword, hashPassword
@@ -375,7 +375,7 @@ async def create_item(req: Request, image: UploadFile = Form(...), name: str = F
 
     abs_cwd = os.getcwd()
 
-    with open(os.path.join(abs_cwd + "/app/store/images", storeId + "_" + name + ".jpeg"), "wb") as fp:
+    with open(os.path.join(abs_cwd + "/app/store/images", storeId + "_" + name + ".jpg"), "wb") as fp:
         fp.write(content)
 
     client.close()
@@ -397,7 +397,7 @@ async def delete_item(menu_name: str, req: Request):
     abs_cwd = os.getcwd()
 
     try:
-        os.remove(abs_cwd + "/app/store/images/" + storeId + "_" + menu_name + ".jpeg")
+        os.remove(abs_cwd + "/app/store/images/" + storeId + "_" + menu_name + ".jpg")
     except FileNotFoundError:
         print("File not found.")
 
