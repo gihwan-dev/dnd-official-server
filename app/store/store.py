@@ -1,7 +1,5 @@
 import os
 from datetime import datetime
-from typing import List
-
 from fastapi import APIRouter, UploadFile, Form
 from fastapi import HTTPException, status, Request
 from fastapi.responses import FileResponse
@@ -9,6 +7,8 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel
+from starlette.responses import FileResponse
+from typing import List
 
 from app.lib.db.pymongo_connect_database import connect_database
 from app.lib.hash.hash import comparePassword, hashPassword
@@ -357,7 +357,8 @@ async def create_item(req: Request, image: UploadFile = Form(...), name: str = F
         name=name,
         price=price,
         description=description,
-        available=True
+        available=True,
+        amount=0
     )
 
     updating_items.append(new_item.dict())
@@ -386,9 +387,9 @@ async def delete_item(menu_name: str, req: Request):
     storeId = get_current_store_id(encoded_id)
 
     client = connect_database()
-    collection = client.get_database("dnd").get_collection("stores")
+    collections = client.get_database("dnd").get_collection("stores")
 
-    delete_result = collection.update_one(
+    delete_result = collections.update_one(
         {"storeId": storeId},
         {"$pull": {"items": {"name": menu_name}}}
     )
@@ -399,7 +400,7 @@ async def delete_item(menu_name: str, req: Request):
         os.remove(abs_cwd + "/app/store/images/" + storeId + "_" + menu_name + ".jpeg")
     except FileNotFoundError:
         print("File not found.")
-        
+
     if not delete_result.acknowledged:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -411,7 +412,30 @@ async def delete_item(menu_name: str, req: Request):
 @router.get("/item/{filename}")
 async def get_image(filename: str):
     abs_cwd = os.getcwd()
-    return FileResponse(f'{abs_cwd}/app/store/images/{filename}.jpeg', media_type="image/jpeg")
+    return FileResponse(f'{abs_cwd}/app/store/images/{filename}.jpg', media_type="image/jpg")
+
+
+class UpdateItemReq(BaseModel):
+    item: Item
+
+
+@router.patch("/item")
+async def update_item(req: Request, data: UpdateItemReq):
+    encoded_id = req.cookies.get("jwt")
+    storeId = get_current_store_id(encoded_id)
+
+    client = connect_database()
+    collection = client.get_database("dnd").get_collection("stores")
+
+    result = collection.update_one({"storeId": storeId, "items.name": data.item.name},
+                                   {"$set": {"items.$[elem]": data.item.dict()}},
+                                   array_filters=[{"elem.name": data.item.name}])
+
+    if not result.acknowledged:
+        raise HTTPException(
+            status_code=404,
+            detail="업데이트에 실패했습니다. 다시 시도해 주세요."
+        )
 
 
 @router.get("/order")
@@ -421,16 +445,10 @@ async def get_order(req: Request):
 
     client = connect_database()
 
-    order_collection = client.get_database("dnd").get_collection("orders")
+    collection = client.get_database("dnd").get_collection("orders")
 
-    existing_store_orders = order_collection.find({"storeId": storeId})
+    order_list = collection.find({"storeId": storeId})
 
-    updated_orders = []
-
-    for order in existing_store_orders:
-        new_order = order.copy()
-        new_order["_id"] = str(new_order["_id"])
-        updated_orders.append(new_order)
-
-    client.close()
-    return updated_orders
+    return {
+        "orders": order_list
+    }
