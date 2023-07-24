@@ -380,6 +380,34 @@ async def create_item(req: Request, image: UploadFile = Form(...), name: str = F
     client.close()
 
 
+@router.delete("/item/{menu_name}")
+async def delete_item(menu_name: str, req: Request):
+    encoded_id = req.cookies.get("jwt")
+    storeId = get_current_store_id(encoded_id)
+
+    client = connect_database()
+    collection = client.get_database("dnd").get_collection("stores")
+
+    delete_result = collection.update_one(
+        {"storeId": storeId},
+        {"$pull": {"items": {"name": menu_name}}}
+    )
+
+    abs_cwd = os.getcwd()
+
+    try:
+        os.remove(abs_cwd + "/app/store/images/" + storeId + "_" + menu_name + ".jpeg")
+    except FileNotFoundError:
+        print("File not found.")
+        
+    if not delete_result.acknowledged:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="메뉴를 제거하는데 실패했습니다. 다시 시도해 주세요."
+        )
+    return {"message": "메뉴를 성공적으로 제거했습니다."}
+
+
 @router.get("/item/{filename}")
 async def get_image(filename: str):
     abs_cwd = os.getcwd()
