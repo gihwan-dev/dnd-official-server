@@ -1,10 +1,12 @@
 from typing import List
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.lib.db.pymongo_connect_database import connect_database
 from app.model.order import Order
+
+from bson import ObjectId
 
 router = APIRouter()
 
@@ -28,6 +30,10 @@ class GetOrder(BaseModel):
 class Test(BaseModel):
     data: str
 
+
+class StatusUpdateRequest(BaseModel):
+    order_id: str
+    new_status: str
 
 @router.post("/")
 async def get_order(user: GetOrder):
@@ -76,3 +82,52 @@ async def complete_order(order_info: Order):
         return {"accepted": True}
 
     return {"accepted": False}
+
+@router.get("/count")   
+async def get_order_count():
+    client = connect_database()
+
+    order_collection = client.get_database("dnd").get_collection("orders")
+
+    order_count = order_collection.count_documents({})
+
+    client.close()
+
+    return {"order_count" : order_count}
+
+
+@router.get("/Info")
+async def get_order_info():
+    client = connect_database()
+
+    order_collection = client.get_database("dnd").get_collection("orders")
+
+    orders = list(order_collection.find())
+    orders_list = []
+
+    for order in orders:
+        order['_id'] = str(order['_id'])
+        orders_list.append(order)
+
+    client.close()
+
+    return {"orders" : orders}
+
+
+@router.post("/Status")
+async def Status_change(request: StatusUpdateRequest):
+    client = connect_database()
+
+    order_collection = client.get_database("dnd").get_collection("orders")
+
+
+    result = order_collection.update_one(
+        {"_id": ObjectId(request.order_id)},
+        {"$set" : {"status": request.new_status}}
+    )
+
+    if result.modified_count:
+        client.close()
+        return {"status": "success", "message": "Order status updated successfully"}
+    else:
+        raise HTTPException(status_code=404, detail="Order not found")
