@@ -1,50 +1,44 @@
-from datetime import datetime
-
-import schedule
 import uvicorn
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 
-from app.lib.db.pymongo_connect_database import connect_database
-from app.model.store import Daily
 from app.order.order import router as order_router
 from app.store.store import router as store_router
 from app.user.user import router as user_router
 
 app = FastAPI()
 
-
 # 매 정각마다 dailyCount 초기화 및 total 초기화
 # dailyCount를 amount에 total을 total에 할당하고 date에 오늘 날짜를 넣어 years에 month 안에 넣어줘야함.
-def initialize_day():
-    client = connect_database()
-    collections = client.get_database("dnd").get_collection("stores")
-    stores = collections.find()
-    now = datetime.now()
-    year = now.year
-    month = now.month
-    day = now.day
-
-    for store in stores:
-        new_data = Daily(
-            date=day,
-            total=store["total"],
-            amount=store["dailyCount"]
-        )
-        for store_year in stores["years"]:
-            if store_year["year"] == year:
-                for store_month in store_year["month_list"]:
-                    if store_month["month"] == month:
-                        store_month["day_list"].append(new_data.dict())
-        collections.update_one({"storeId": store["storeId"]}, {"$set": {
-            "total": 0,
-            "dailyCount": 0,
-            "years": store["years"]
-        }})
-    client.close()
-
-
-schedule.every().day.at("00:00").do(initialize_day)
+# def initialize_day():
+#     client = connect_database()
+#     collections = client.get_database("dnd").get_collection("stores")
+#     stores = collections.find()
+#     now = datetime.now()
+#     year = now.year
+#     month = now.month
+#     day = now.day
+#
+#     for store in stores:
+#         new_data = Daily(
+#             date=day,
+#             total=store["total"],
+#             amount=store["dailyCount"]
+#         )
+#         for store_year in stores["years"]:
+#             if store_year["year"] == year:
+#                 for store_month in store_year["month_list"]:
+#                     if store_month["month"] == month:
+#                         store_month["day_list"].append(new_data.dict())
+#         collections.update_one({"storeId": store["storeId"]}, {"$set": {
+#             "total": 0,
+#             "dailyCount": 0,
+#             "years": store["years"]
+#         }})
+#     client.close()
+#
+#
+# schedule.every().day.at("00:00").do(initialize_day)
 
 origins = [
     "http://localhost:5173",

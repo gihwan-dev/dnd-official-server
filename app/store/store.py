@@ -1,16 +1,18 @@
+import os
 from datetime import datetime
 from typing import List
 
-from fastapi import APIRouter
+from fastapi import APIRouter, UploadFile, Form
 from fastapi import HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel
+from starlette.responses import FileResponse
 
 from app.lib.db.pymongo_connect_database import connect_database
 from app.lib.hash.hash import comparePassword, hashPassword
-from app.model.store import StoreModel, Daily, Month, Year
+from app.model.store import StoreModel, Daily, Month, Year, Item
 
 SECRET_KEY = "ex5eYU5PgIQDyyAN+aJFBm+3ADNAV8V7g168sgRZ/7w="
 ALGORITHM = "HS256"
@@ -335,4 +337,118 @@ async def insertYear(data: TestInsertYear):
     client.close()
     return {
         "isInserted": False
+    }
+
+
+@router.post("/item")
+async def create_item(req: Request, image: UploadFile = Form(...), name: str = Form(...),
+                      description: str = Form(...), price: int = Form(...)):
+    encoded_id = req.cookies.get("jwt")
+    storeId = get_current_store_id(encoded_id)
+
+    client = connect_database()
+    collections = client.get_database("dnd").get_collection("stores")
+
+    store = collections.find_one({"storeId": storeId})
+
+    updating_items = store["items"].copy()
+
+    new_item = Item(
+        name=name,
+        price=price,
+        description=description,
+        available=True,
+        amount=0
+    )
+
+    updating_items.append(new_item.dict())
+
+    insert_item = collections.update_one({"storeId": storeId}, {"$set": {"items": updating_items}})
+
+    if not insert_item.acknowledged:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="메뉴를 추가하는데 실패했습니다."
+        )
+
+    content = await image.read()
+
+    abs_cwd = os.getcwd()
+
+    with open(os.path.join(abs_cwd + "/app/store/images", storeId + "_" + name + ".jpg"), "wb") as fp:
+        fp.write(content)
+
+    client.close()
+
+
+@router.delete("/item/{menu_name}")
+async def delete_item(menu_name: str, req: Request):
+    encoded_id = req.cookies.get("jwt")
+    storeId = get_current_store_id(encoded_id)
+
+    client = connect_database()
+    collections = client.get_database("dnd").get_collection("stores")
+
+    delete_result = collections.update_one(
+        {"storeId": storeId},
+        {"$pull": {"items": {"name": menu_name}}}
+    )
+
+    abs_cwd = os.getcwd()
+
+    try:
+        os.remove(abs_cwd + "/app/store/images/" + storeId + "_" + menu_name + ".jpg")
+    except FileNotFoundError:
+        print("File not found.")
+
+    if not delete_result.acknowledged:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="메뉴를 제거하는데 실패했습니다. 다시 시도해 주세요."
+        )
+    return {"message": "메뉴를 성공적으로 제거했습니다."}
+
+
+@router.get("/item/{filename}")
+async def get_image(filename: str):
+    abs_cwd = os.getcwd()
+    return FileResponse(f'{abs_cwd}/app/store/images/{filename}.jpg', media_type="image/jpg")
+
+
+class UpdateItemReq(BaseModel):
+    item: Item
+
+
+@router.patch("/item")
+async def update_item(req: Request, data: UpdateItemReq):
+    encoded_id = req.cookies.get("jwt")
+    storeId = get_current_store_id(encoded_id)
+
+    client = connect_database()
+    collection = client.get_database("dnd").get_collection("stores")
+
+    result = collection.update_one({"storeId": storeId, "items.name": data.item.name},
+                                   {"$set": {"items.$[elem]": data.item.dict()}},
+                                   array_filters=[{"elem.name": data.item.name}])
+
+    if not result.acknowledged:
+        raise HTTPException(
+            status_code=404,
+            detail="업데이트에 실패했습니다. 다시 시도해 주세요."
+        )
+
+
+@router.get("/order")
+async def get_order(req: Request):
+    encoded_id = req.cookies.get("jwt")
+    storeId = get_current_store_id(encoded_id)
+
+    client = connect_database()
+
+    collection = client.get_database("dnd").get_collection("orders")
+
+    order_list = collection.find({"storeId": storeId})
+
+    return {
+        "orders": order_list
     }

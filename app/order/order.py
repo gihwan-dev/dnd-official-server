@@ -36,29 +36,7 @@ class StatusUpdateRequest(BaseModel):
     new_status: str
 
 @router.post("/")
-async def get_order(user: GetOrder):
-    client = connect_database()
-
-    userOrder = client.get_database("dnd").get_collection("orders").find_one({"userEmail": user.userEmail})
-
-    if userOrder:
-        client.close()
-        return {
-            "userEmail": userOrder["userEmail"],
-            "userName": userOrder["userName"],
-            "total": userOrder["total"],
-            "payMethod": userOrder["payMethod"],
-            "payDate": userOrder["payDate"],
-            "cart": userOrder["cart"],
-            "isValidate": True
-        }
-
-    client.close()
-    return {"isValidate": False}
-
-
-@router.post("/complete")
-async def complete_order(order_info: Order):
+async def create_order(order_info: Order):
     client = connect_database()
 
     new_items = [item.dict() for item in order_info.items]
