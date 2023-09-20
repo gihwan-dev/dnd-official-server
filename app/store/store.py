@@ -202,7 +202,7 @@ async def create_store(store: CreateStore):
     }
 
 
-@router.get("/", response_model=StoreModel)
+@router.get("/")
 async def get_store(request: Request):
     encoded_id = request.cookies.get("jwt")
     storeId = get_current_store_id(encoded_id)
@@ -211,6 +211,15 @@ async def get_store(request: Request):
     current_store = client.get_database("dnd").get_collection("stores").find_one({"storeId": storeId})
     client.close()
     return current_store
+
+
+@router.get("/all")
+async def get_all_store():
+    client = connect_database()
+    stores = client.get_database("dnd").get_collection("stores").find({}, {"_id": 0})
+    stores = list(stores)
+    client.close()
+    return stores
 
 
 class AddMemoRequest(BaseModel):

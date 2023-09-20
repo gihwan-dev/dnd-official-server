@@ -30,6 +30,9 @@ class GetOrder(BaseModel):
 class Test(BaseModel):
     data: str
 
+class CheckOrderInfo(BaseModel):
+    userEmail: str
+
 
 class StatusUpdateRequest(BaseModel):
     order_id: str
@@ -73,8 +76,22 @@ async def get_order_count():
 
     return {"order_count" : order_count}
 
+@router.post("/check")
+async def check_order_info(request: CheckOrderInfo):
+    client = connect_database()
+    orders = client.get_database("dnd").get_collection("orders").find({ "userEmail": request.userEmail })
 
-@router.get("/Info")
+    orders = list(orders)
+    client.close()
+
+    if not orders:
+        return { "isValidate": False }
+
+    return {"isValidate": True}
+
+
+
+@router.get("/info")
 async def get_order_info():
     client = connect_database()
 
